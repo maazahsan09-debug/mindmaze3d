@@ -1,1 +1,1 @@
-# mindmaze3d
+# index.html
