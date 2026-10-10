@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090d1d">
+<title>MindMaze 3D — Brain Puzzle</title>
+<meta name="description" content="Play MindMaze 3D, a free 3D sliding brain puzzle. Solve the tiles, beat your moves, and train your mind.">
+<style>
+  :root{color-scheme:dark;--bg:#090d1d;--panel:#111832;--cyan:#68e1fd;--purple:#9a7bff;--text:#f5f7ff;--muted:#aab4d4}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(ellipse at 50% 0%,#202658 0%,var(--bg) 55%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+  .wrap{max-width:1000px;margin:auto;padding:24px 16px 40px}
+  header{text-align:center;margin:10px auto 20px}
+  .eyebrow{color:var(--cyan);font-size:.78rem;letter-spacing:.2em;font-weight:800;text-transform:uppercase}
+  h1{font-size:clamp(2rem,6vw,3.8rem);line-height:1.05;margin:10px 0;background:linear-gradient(90deg,#fff,#7ceaff,#ae91ff);color:transparent;background-clip:text}
+  .subtitle{color:var(--muted);margin:0 auto;max-width:560px}
+  .layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(250px,.8fr);gap:18px;align-items:stretch}
+  .panel{background:linear-gradient(145deg,rgba(22,31,65,.94),rgba(12,17,38,.96));border:1px solid rgba(140,164,255,.2);border-radius:22px;box-shadow:0 18px 60px #0005;overflow:hidden}
+  #stage{height:470px;position:relative;touch-action:pan-y}
+  #stage canvas{display:block;width:100%;height:100%;outline:none}
+  .stage-label{position:absolute;left:16px;top:14px;pointer-events:none;background:#080d1dc9;border:1px solid #ffffff20;border-radius:12px;padding:8px 11px;font-size:.78rem;color:#d7e8ff}
+  .side{padding:20px;display:flex;flex-direction:column;gap:15px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:13px;background:#070c1f8c;border:1px solid #ffffff12;border-radius:14px}
+  .stat span{display:block;font-size:.75rem;color:var(--muted)}
+  .stat strong{font-size:1.65rem}
+  .goal{padding:14px;border-radius:14px;background:linear-gradient(110deg,#1c3262,#2a2056);border:1px solid #7b8cff40}
+  .goal strong{display:block;margin-bottom:5px}
+  .goal p{margin:0;color:#cbd5f5;font-size:.9rem;line-height:1.5}
+  button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:12px 14px;font-weight:750;transition:transform .12s,filter .12s}
+  button:active{transform:scale(.98)}
+  .primary{background:linear-gradient(100deg,#5ce5fa,#9b82ff);color:#071023}
+  .secondary{background:#222d50;color:#edf2ff;border:1px solid #ffffff19}
+  .buttons{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .hint{font-size:.86rem;line-height:1.5;color:var(--muted);margin:0}
+  #message{min-height:48px;padding:12px;border-radius:12px;background:#080d1d88;color:#dce7ff;font-size:.92rem;line-height:1.45}
+  .how{margin-top:18px;padding:20px 22px}
+  .how h2{margin:0 0 10px;font-size:1.15rem}
+  .how p{margin:0;color:var(--muted);line-height:1.65}
+  .footer{text-align:center;color:#8290b6;font-size:.8rem;margin-top:18px}
+  @media(max-width:760px){.layout{grid-template-columns:1fr}#stage{height:min(112vw,430px)}.side{padding:16px}.wrap{padding:16px 12px 30px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">A little challenge for your mind</div>
+    <h1>MindMaze 3D</h1>
+    <p class="subtitle">Slide the glowing tiles into order. Think ahead, use fewer moves, and beat your best score.</p>
+  </header>
+  <main class="layout">
+    <section class="panel">
+      <div id="stage" aria-label="Interactive 3D sliding puzzle board">
+        <div class="stage-label">DRAG TO LOOK · TAP A TILE TO MOVE</div>
+      </div>
+    </section>
+    <aside class="panel side">
+      <div class="stats">
+        <div class="stat"><span>YOUR MOVES</span><strong id="moves">0</strong></div>
+        <div class="stat"><span>BEST MOVES</span><strong id="best">—</strong></div>
+      </div>
+      <div class="goal"><strong>🎯 Your mission</strong><p>Put the numbers in order from 1 to 8. The empty space belongs at the bottom-right.</p></div>
+      <div class="buttons">
+        <button class="primary" id="shuffle">New puzzle</button>
+        <button class="secondary" id="reset">Restart</button>
+      </div>
+      <div id="message" role="status" aria-live="polite">Ready? Tap a tile next to the empty space to slide it.</div>
+      <p class="hint"><b>Tip:</b> A tile can move only when it touches the empty space. You can also drag the board to look around.</p>
+    </aside>
+  </main>
+  <section class="panel how">
+    <h2>How to play</h2>
+    <p>Tap or click a tile beside the empty slot. Arrange the tiles as 1, 2, 3 / 4, 5, 6 / 7, 8, empty. Press <b>New puzzle</b> for a fresh solvable challenge. This demo runs in your browser; it does not need an account.</p>
+  </section>
+  <div class="footer">MindMaze 3D · Free browser puzzle · Keep thinking, keep playing.</div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const stage = document.getElementById('stage');
+const movesEl = document.getElementById('moves');
+const bestEl = document.getElementById('best');
+const messageEl = document.getElementById('message');
+const shuffleBtn = document.getElementById('shuffle');
+const resetBtn = document.getElementById('reset');
+
+let scene, camera, renderer, boardGroup, tiles = [], numbers = [1,2,3,4,5,6,7,8,0];
+let moves = 0, startNumbers = numbers.slice(), locked = false;
+let raycaster, pointer, dragging = false, downX = 0, downY = 0, didDrag = false;
+let best = null;
+try { best = Number(localStorage.getItem('mindmaze-best')) || null; } catch(e) {}
+bestEl.textContent = best ?? '—';
+
+const colors = [0x56dcf4,0x6bc7ff,0x8e9dff,0xa18bff,0xc18aff,0x76e6d1,0x70a8ff,0xb6a0ff];
+
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1024);
+  scene.fog = new THREE.Fog(0x0b1024, 11, 23);
+  camera = new THREE.PerspectiveCamera(38, stage.clientWidth/stage.clientHeight, .1, 100);
+  camera.position.set(5.8,7.8,9.2);
+  camera.lookAt(0,0,0);
+  renderer = new THREE.WebGLRenderer({antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1,2));
+  renderer.setSize(stage.clientWidth,stage.clientHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.25;
+  stage.appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xb8eaff,0x202047,2.1));
+  const key = new THREE.DirectionalLight(0xffffff,3.0); key.position.set(4,8,5); scene.add(key);
+  const rim = new THREE.PointLight(0x547bff,22,18); rim.position.set(-4,4,-3); scene.add(rim);
+  const glow = new THREE.PointLight(0x36dfff,10,14); glow.position.set(3,2,4); scene.add(glow);
+  boardGroup = new THREE.Group(); scene.add(boardGroup);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(6.25,.36,6.25),new THREE.MeshStandardMaterial({color:0x1a2344,metalness:.45,roughness:.34}));
+  base.position.y=-.23; boardGroup.add(base);
+  const grid = new THREE.GridHelper(6,3,0x5269ad,0x28375f); grid.position.y=-.035; boardGroup.add(grid);
+  raycaster = new THREE.Raycaster(); pointer = new THREE.Vector2();
+  makeTiles();
+  renderer.domElement.addEventListener('pointerdown', onDown);
+  renderer.domElement.addEventListener('pointerup', onUp);
+  renderer.domElement.addEventListener('pointermove', onMove);
+  renderer.domElement.addEventListener('pointerleave', ()=>{dragging=false;});
+  window.addEventListener('resize', resize);
+  animate();
+}
+function makeTile(n, index){
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    color: colors[(n-1)%colors.length], metalness:.28, roughness:.25,
+    emissive: colors[(n-1)%colors.length], emissiveIntensity:.17
+  });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.82,.34,1.82),material);
+  body.position.y=.16; body.castShadow=true; body.receiveShadow=true; group.add(body);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.84,.36,1.84)),new THREE.LineBasicMaterial({color:0xd8f8ff,transparent:true,opacity:.75}));
+  edges.position.y=.16; group.add(edges);
+  const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=256;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,256,256);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 126px system-ui, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(n),128,126);
+  ctx.font='bold 22px system-ui, sans-serif'; ctx.globalAlpha=.8; ctx.fillText('MIND',128,215);
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace=THREE.SRGBColorSpace;
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(1.55,1.55),new THREE.MeshBasicMaterial({map:tex,transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+  label.rotation.x=-Math.PI/2; label.position.y=.345; group.add(label);
+  group.userData.number=n;
+  group.userData.index=index;
+  boardGroup.add(group); tiles.push(group);
+  placeTile(group,index);
+}
+function makeTiles(){
+  tiles.forEach(t=>{boardGroup.remove(t);t.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});});
+  tiles=[];
+  numbers.forEach((n,i)=>{if(n!==0)makeTile(n,i);});
+}
+function placeTile(tile,index){
+  const row=Math.floor(index/3), col=index%3;
+  tile.position.set((col-1)*2.02,.03,(row-1)*2.02);
+}
+function syncPositions(){
+  tiles.forEach(t=>{const idx=numbers.indexOf(t.userData.number);t.userData.index=idx;placeTile(t,idx);});
+}
+function render(){renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate); if(boardGroup && !dragging){boardGroup.rotation.y += 0.0009;} render();}
+function resize(){
+  if(!renderer)return;
+  const w=stage.clientWidth,h=stage.clientHeight;
+  camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);
+}
+function updateUI(){
+  movesEl.textContent=moves;
+  if(isSolved()){
+    messageEl.textContent=`🎉 Brilliant! Puzzle solved in ${moves} moves.`;
+    if(best===null||moves<best){best=moves;bestEl.textContent=best;try{localStorage.setItem('mindmaze-best',String(best));}catch(e){}}
+  }
+}
+function isSolved(){return numbers.every((n,i)=>n===(i===8?0:i+1));}
+function legalMoves(){
+  const z=numbers.indexOf(0), r=Math.floor(z/3),c=z%3, out=[];
+  if(r>0)out.push(z-3);if(r<2)out.push(z+3);if(c>0)out.push(z-1);if(c<2)out.push(z+1);
+  return out;
+}
+function moveIndex(index){
+  if(locked)return;
+  const z=numbers.indexOf(0);
+  if(!legalMoves().includes(index)){messageEl.textContent='That tile cannot move yet. Choose a tile beside the empty slot.';return;}
+  [numbers[index],numbers[z]]=[numbers[z],numbers[index]];
+  moves++; syncPositions(); updateUI();
+  if(!isSolved())messageEl.textContent='Good move! Keep arranging the numbers in order.';
+}
+function shuffle(){
+  numbers=[1,2,3,4,5,6,7,8,0]; moves=0;
+  let previous=-1;
+  for(let i=0;i<150;i++){
+    const options=legalMoves().filter(x=>x!==previous);
+    const next=options[Math.floor(Math.random()*options.length)];
+    previous=numbers.indexOf(0);
+    [numbers[next],numbers[previous]]=[numbers[previous],numbers[next]];
+  }
+  if(isSolved())shuffle();
+  startNumbers=numbers.slice();syncPositions();updateUI();
+  messageEl.textContent='New puzzle ready. Find the empty slot and start sliding!';
+}
+function restart(){
+  numbers=startNumbers.slice();moves=0;syncPositions();updateUI();
+  messageEl.textContent='Puzzle restarted. Try to solve it in fewer moves.';
+}
+function onDown(e){dragging=true;didDrag=false;downX=e.clientX;downY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId);}
+function onMove(e){
+  if(!dragging)return;
+  const dx=e.clientX-downX,dy=e.clientY-downY;
+  if(Math.abs(dx)+Math.abs(dy)>12)didDrag=true;
+  if(didDrag){boardGroup.rotation.y += dx*.006;boardGroup.rotation.x=Math.max(-.18,Math.min(.18,boardGroup.rotation.x+dy*.001));downX=e.clientX;downY=e.clientY;}
+}
+function onUp(e){
+  if(!dragging)return;dragging=false;
+  if(didDrag)return;
+  const rect=renderer.domElement.getBoundingClientRect();
+  pointer.x=((e.clientX-rect.left)/rect.width)*2-1;
+  pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(pointer,camera);
+  const hits=raycaster.intersectObjects(tiles,true);
+  if(hits.length){let obj=hits[0].object;while(obj.parent&&obj.userData.number===undefined)obj=obj.parent;if(obj.userData.number!==undefined)moveIndex(numbers.indexOf(obj.userData.number));}
+}
+shuffleBtn.addEventListener('click',shuffle);
+resetBtn.addEventListener('click',restart);
+init();shuffle();
+</script>
+</body>
+</html>
